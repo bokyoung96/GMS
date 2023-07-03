@@ -1,5 +1,4 @@
 import pandas as pd
-import numpy as np
 from enum import Enum, unique
 
 MIRAE_NAME = "mirae-%s.csv"
@@ -37,11 +36,10 @@ class DataHelper:
     def get_data(self, data_lists: list) -> pd.DataFrame:
         return [pd.read_csv("./{}".format(data_list.value)) for data_list in data_lists]
 
+    def run_mirae(self) -> list:
+        mirae_data_lists = [DataPool.mirae_apy_itm,
+                            DataPool.mirae_cs,
+                            DataPool.mirae_mkt_idx]
 
-if __name__ == "__main__":
-    mirae_data_lists = [DataPool.mirae_apy_itm,
-                        DataPool.mirae_cs,
-                        DataPool.mirae_mkt_idx]
-
-    data_helper = DataHelper()
-    mirae_data = data_helper.get_data(mirae_data_lists)
+        mirae_data = self.get_data(mirae_data_lists)
+        return mirae_data
