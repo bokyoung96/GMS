@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 from enum import Enum, unique
 
@@ -64,15 +65,47 @@ class CustomerPool(Enum):
 
 
 class CustomerHelper(DataHelper):
-    def __init__(self):
-        super().__init__()
-        self.customer = self.run_mirae[1]
-        self.customer_info = self.customer[['AGE_TCD',
-                                            'MT_EP_EXIST_YN']]
+    def __init__(self, item_type: str):
+        """
+        <item_type>
 
-    @staticmethod
-    def filter_data(item_type: str) -> list:
-        return list(filter(lambda name: item_type in name, CustomerPool.__dict__.keys()))
+        ast: ASSET ITEM
+        trans: TRANSACTION ITEM
+        """
+        super().__init__()
+        self.customer = self.run_mirae()[1]
+        self._customer_info = ['AGE_TCD', 'MT_EP_EXIST_YN']
+        self.customer_info = self.customer[self._customer_info]
+        self.item_type = item_type
+
+    def filter_name(self) -> list:
+        return list(filter(lambda name: self.item_type in name,
+                           CustomerPool.__dict__.keys()))
+
+    def filter_data(self) -> pd.DataFrame:
+        filter_name = self.filter_name()
+        length = len(filter_name)
+        filter_attr = np.concatenate(
+            [getattr(CustomerPool, filter_name[i]).value for i in range(length)])
+        res = pd.concat(
+            [self.customer_info, self.customer[filter_attr]], axis=1)
+        return res
+
+    def filter_data_category(self, item_category: str) -> pd.DataFrame:
+        """
+        <item_category>
+
+        eval
+        pchs
+        pchs_rank
+        """
+        df = self.filter_data()
+        filter_category = [col for col in df.columns if item_category in col]
+        res = df[self._customer_info + filter_category]
+        return res
 
     def filter_data_month(self):
         return
+
+    # TODO: customer_info의 기본 데이터 + filter_data 동시 불러오기
+    # TODO: 데이터 수 CHECK
