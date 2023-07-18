@@ -293,6 +293,8 @@ class CustomerHelper(DataHelper):
         self.item_type = item_type
 
         self.customer = self.run_mirae()[1]
+        self.customer = self.customer.replace(
+            {'MT_EP_EXIST_YN': {'Y': 1, 'N': 0}})
         self._customer_info = ['AGE_TCD', 'MT_EP_EXIST_YN',
                                'LST_BEST_EA', 'LST_BEST_YM']
         self.customer_info = self.customer[self._customer_info]
