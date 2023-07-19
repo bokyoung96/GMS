@@ -6,7 +6,7 @@ from loader_cs import *
 # AST DECORATOR
 
 
-def run_ast(param):
+def customer_classificer(param):
     def decorator(func):
         def wrapper(self, *args, **kwargs):
             if args and args[0] == param:
@@ -36,7 +36,7 @@ class CustomerAnalysis(CustomerHelper):
 
     @staticmethod
     def get_string(df: pd.DataFrame) -> pd.DataFrame:
-        # NOTE: AFTER FILLNA() PROCESS IN get_process.
+        # NOTE: AFTER FILLNA() PROCESS IN get_preprocess.
         strings = df.apply(lambda x: any(isinstance(val, str) for val in x))
         res = df.columns[strings].tolist()
         return res
@@ -52,15 +52,35 @@ class CustomerAnalysis(CustomerHelper):
         res = pd.DataFrame(temp, columns=['Val', 'Elements'])
         return res
 
-    @run_ast(param='ast')
+    @customer_classificer(param='ast')
     def convert_string(self, item_type: str):
-        ovst_ast_mkt_rank = CustomerPool.ovst_ast_mkt_rank.value
-        df = self.customer_filter.filter(ovst_ast_mkt_rank).apply(
-            lambda x: pd.factorize(x)[0] + 1)
-        # convert_log = {}
-        # for col in df.columns:
-        #     convert_log[col] = dict(zip(convert_log[col], convert_log[col]))
-        return df
+        # strs = {'dmst_ast_itm_rank': CustomerPool.dmst_ast_itm_rank.value,
+        #         'ovst_ast_itm_rank': CustomerPool.ovst_ast_itm_rank.value,
+        #         'dmst_ast_mkt_rank': CustomerPool.dmst_ast_mkt_rank.value,
+        #         'ovst_ast_mkt_rank': CustomerPool.ovst_ast_mkt_rank.value}
+        # NOTE: itm / high cost to replace; change to integer.
+
+        strs = {'dmst_ast_mkt_rank': CustomerPool.dmst_ast_mkt_rank.value,
+                'ovst_ast_mkt_rank': CustomerPool.ovst_ast_mkt_rank.value}
+
+        def converter(name: str) -> pd.DataFrame:
+            temp = self.customer_filter.filter(strs[name])
+            unique_df = pd.DataFrame(
+                set(temp.stack().values), columns=['unique_df'])
+            unique_df['unique_id'] = pd.factorize(
+                unique_df['unique_df'])[0] + 1
+            convert_log = dict(
+                zip(unique_df['unique_df'], unique_df['unique_id']))
+            res = temp.replace(convert_log)
+            return res, convert_log
+
+        log = []
+        for key in strs:
+            temp, convert_log = converter(key)
+            cols = strs[key]
+            self.customer_filter[cols] = temp[cols]
+            log.append(convert_log)
+        return log
 
     def get_preprocess(self):
         # TODO: Add static defs.

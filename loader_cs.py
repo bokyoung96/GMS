@@ -361,13 +361,13 @@ class CustomerHelper(DataHelper):
         return res
 
 
-if __name__ == "__main__":
-    # REMINDER: TAKES LONG TIME (3 MIN)
+# if __name__ == "__main__":
+#     # REMINDER: TAKES LONG TIME (3 MIN)
 
-    helpers = ['ast', 'trs', 'acs', 'snp', 'rto']
-    customer_helpers = [CustomerHelper(helper) for helper in helpers]
+#     helpers = ['ast', 'trs', 'acs', 'snp', 'rto']
+#     customer_helpers = [CustomerHelper(helper) for helper in helpers]
 
-    res = []
+#     res = []
 
-    for helper in customer_helpers:
-        res.append(helper.filter_data())
+#     for helper in customer_helpers:
+#         res.append(helper.filter_data())
