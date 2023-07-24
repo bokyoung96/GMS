@@ -34,9 +34,10 @@ class AutoEncoder(nn.Module, CustomerLearning):
         decoded = self.decoder(encoded)
         return encoded, decoded
 
+
 class KMeansClustering(CustomerLearning):
     def __init__(self):
         super().__init__()
-        
+
     def k_means_clustering(self):
         return
