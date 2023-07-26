@@ -1,12 +1,9 @@
-import tensorflow
-
-from tensorflow import keras
-from keras.utils import to_categorical
 from sklearn.preprocessing import RobustScaler
 from itertools import chain
 
 from loader_cs import *
 from cs_learning import *
+
 
 # AST DECORATOR
 
@@ -32,6 +29,28 @@ class CustomerAnalysis(CustomerHelper):
         self.customer_filter = self.filter_data()
         self.customer_filter = self.customer_filter.replace(
             {'MT_EP_EXIST_YN': {'Y': 1, 'N': 0}})
+
+        self.mkts = ['런던', '스위스', '노르웨이', '싱가포르', '런던(USD)', '핀란드', '코스피', '인도네시아', '토론토(USD)', '미국기타', 'OTC', '나스닥', '토론토', '*', '상해A', 'UPCOM',
+                     '뉴욕', '코스닥', '심천A', '독일', '홍콩(USD)', 'CSE(바이오큐어)', '호주', '호치민', '코넥스', '동경', '홍콩', '프랑스', '아멕스', '토론토벤처', '그리스', '네덜란드']
+
+        self.tkrs = ['.L', '.S', '.OL', '.SI', '.L', '.H', '.KS', '.JK', '.TO', '.PK^L22', '.PK', '', '.TO', '',
+                     '.SS', '.HNO', '', '.KQ', '.SZ', '.DE', '.HK', '.K', '.AX', '.HM', '.KN', '.T', '.HK',
+                     '.PA', '.K', '.V', '.AT^L14', '.AS']
+
+        self.strs_mkts = {'dmst_ast_mkt_rank': CustomerPool.dmst_ast_mkt_rank.value,
+                          'ovst_ast_mkt_rank': CustomerPool.ovst_ast_mkt_rank.value,
+                          'buy_trs_mkt_rank': CustomerPool.buy_trs_mkt_rank.value,
+                          'sel_trs_mkt_rank': CustomerPool.sel_trs_mkt_rank.value}
+
+        self.strs_trs = {'buy_trs_itm_rank': CustomerPool.buy_trs_itm_rank.value,
+                         'sel_trs_itm_rank': CustomerPool.sel_trs_itm_rank.value,
+                         'buy_trs_mkt_rank': CustomerPool.buy_trs_mkt_rank.value,
+                         'sel_trs_mkt_rank': CustomerPool.sel_trs_mkt_rank.value}
+
+        self.strs_ast = {'dmst_ast_itm_rank': CustomerPool.dmst_ast_itm_rank.value,
+                         'ovst_ast_itm_rank': CustomerPool.ovst_ast_itm_rank.value,
+                         'dmst_ast_mkt_rank': CustomerPool.dmst_ast_mkt_rank.value,
+                         'ovst_ast_mkt_rank': CustomerPool.ovst_ast_mkt_rank.value}
 
     @staticmethod
     def get_nan(df: pd.DataFrame, threshold: float = 0.95) -> pd.DataFrame:
@@ -111,42 +130,150 @@ class CustomerAnalysis(CustomerHelper):
         res = res.applymap(self.format_float_hk)
         return res
 
-    def convert_string_mkt(self):
-        strs = {'dmst_ast_mkt_rank': CustomerPool.dmst_ast_mkt_rank.value,
-                'ovst_ast_mkt_rank': CustomerPool.ovst_ast_mkt_rank.value,
-                'buy_trs_mkt_rank': CustomerPool.buy_trs_mkt_rank.value,
-                'sel_trs_mkt_rank': CustomerPool.sel_trs_mkt_rank.value}
-        strs = list(strs.values())
-        strs = list(chain(*strs))
+    @staticmethod
+    def finder_cols(strs: dict):
+        res = list(strs.values())
+        res = list(chain(*res))
+        return res
 
-        customer = self.customer.filter(strs)
-        unique_df = pd.DataFrame(set(customer.stack().values),
-                                 columns=['unique_df']).sort_values(by='unique_df')
-        unique_df['unique_id'] = pd.factorize(unique_df['unique_df'])[0] + 1
-        one_hot = to_categorical(unique_df['unique_id'])
-        unique_df['one_hot'] = pd.DataFrame({'one_hot': one_hot.tolist()})
-        # unique_df['one_hot'] = unique_df['one_hot'].apply(lambda x: [x])
-        # convert_log = dict(zip(unique_df['unique_df'], unique_df['one_hot']))
+    def finder_tkrs(self, item_type: str):
+        """
+        Find mkts and its representative tckrs.
+        """
+        if item_type == 'trs':
+            strs = self.strs_trs
+        elif item_type == 'ast':
+            strs = self.strs_ast
+        strs = self.finder_cols(strs)
 
-        convert_log = dict(zip(unique_df['unique_df'], unique_df['unique_id']))
-        res = customer.replace(convert_log)
-        return res, convert_log
+        df = self.customer.filter(strs)
+        df_itm = df[df.columns[df.columns.str.contains(r'_ITM_', regex=True)]]
+        df_mkt = df[df.columns[df.columns.str.contains(r'_MKT_', regex=True)]]
+
+        res = pd.concat([df_itm.iloc[:, i] for i in range(
+            len(df_itm.columns))], axis=0).reset_index(drop=True)
+        res = pd.concat([res, pd.concat([df_mkt.iloc[:, i] for i in range(
+            len(df_mkt.columns))], axis=0).reset_index(drop=True)], axis=1).dropna()
+        res.columns = ['Ticker', 'Mkt']
+
+        exs = []
+        for mkt in self.mkts:
+            try:
+                exs.append(res[res['Mkt'] == mkt].iloc[0])
+            except IndexError:
+                pass
+        return res, exs
+
+    @staticmethod
+    def split_dfs(df: pd.DataFrame):
+        pd.options.mode.chained_assignment = None
+        middle_col = len(df.columns) // 2
+        df1 = df.iloc[:, :middle_col]
+        df2 = df.iloc[:, middle_col:]
+
+        matched_df = pd.DataFrame()
+        for i in range(middle_col):
+            matched_df[df1.columns[i]] = df1.iloc[:, i]
+            matched_df[df2.columns[i]] = df2.iloc[:, i]
+        return matched_df
 
     def get_convert(self):
-        # NOTE: HIGH TIME-COST
+        """
+        Convert original customer data to analyzable data.
+        Change mkt tkrs to its representative form in Eikon API.
+        """
         res = self.customer.copy()
 
         convert_float_kr = self.convert_float_kr('ast')
         convert_float_hk = self.convert_float_hk('ast')
         convert_float_trs = self.convert_float_trs('trs')
-        convert_string_mkt, log = self.convert_string_mkt()
 
         res[convert_float_kr.columns] = convert_float_kr
         res[convert_float_hk.columns] = convert_float_hk
         res[convert_float_trs.columns] = convert_float_trs
-        res[convert_string_mkt.columns] = convert_string_mkt
         res.replace({'nan': np.nan}, inplace=True)
-        return res, log
+
+        mkts_tkrs = dict(zip(self.mkts, self.tkrs))
+
+        def post_tkrs(item_type: str):
+            # NOTE: HIGH COST
+            if item_type == 'trs':
+                strs = self.strs_trs
+            elif item_type == 'ast':
+                strs = self.strs_ast
+
+            strs = self.finder_cols(strs)
+            df = res.filter(strs)
+
+            matched_df = self.split_dfs(df)
+            matched_df.replace(mkts_tkrs, inplace=True)
+            mathced_cols = list(range(0, len(matched_df.columns), 2))
+
+            for col in mathced_cols:
+                col1 = matched_df.columns[col]
+                col2 = matched_df.columns[col+1]
+                matched_df[col1] = matched_df[col1] + matched_df[col2]
+
+            res_df = matched_df[matched_df.columns[matched_df.columns.str.contains(
+                r'_ITM_', regex=True)]]
+            return res_df
+
+        trs = post_tkrs('trs')
+        ast = post_tkrs('ast')
+
+        res[trs.columns] = trs
+        res[ast.columns] = ast
+        return trs, ast, res
+
+    def convert_string_mkt(self):
+        """
+        One-hot Encoding.
+        """
+        strs = self.strs_mkts
+        strs = list(strs.values())
+        strs = list(chain(*strs))
+
+        customer = self.customer.filter(strs)
+        dummies = pd.get_dummies(customer[strs])
+        return dummies
+
+    # def convert_string_mkt(self):
+    #     strs = {'dmst_ast_mkt_rank': CustomerPool.dmst_ast_mkt_rank.value,
+    #             'ovst_ast_mkt_rank': CustomerPool.ovst_ast_mkt_rank.value,
+    #             'buy_trs_mkt_rank': CustomerPool.buy_trs_mkt_rank.value,
+    #             'sel_trs_mkt_rank': CustomerPool.sel_trs_mkt_rank.value}
+    #     strs = list(strs.values())
+    #     strs = list(chain(*strs))
+
+    #     customer = self.customer.filter(strs)
+    #     unique_df = pd.DataFrame(set(customer.stack().values),
+    #                              columns=['unique_df']).sort_values(by='unique_df')
+    #     unique_df['unique_id'] = pd.factorize(unique_df['unique_df'])[0] + 1
+    #     one_hot = to_categorical(unique_df['unique_id'])
+    #     unique_df['one_hot'] = pd.DataFrame({'one_hot': one_hot.tolist()})
+    #     # unique_df['one_hot'] = unique_df['one_hot'].apply(lambda x: [x])
+    #     # convert_log = dict(zip(unique_df['unique_df'], unique_df['one_hot']))
+
+    #     convert_log = dict(zip(unique_df['unique_df'], unique_df['unique_id']))
+    #     res = customer.replace(convert_log)
+    #     return res, convert_log
+
+    # def get_convert(self):
+    #     # NOTE: HIGH TIME-COST
+    #     res = self.customer.copy()
+
+    #     convert_float_kr = self.convert_float_kr('ast')
+    #     convert_float_hk = self.convert_float_hk('ast')
+    #     convert_float_trs = self.convert_float_trs('trs')
+    #     convert_string_mkt = self.convert_string_mkt()
+
+    #     res[convert_float_kr.columns] = convert_float_kr
+    #     res[convert_float_hk.columns] = convert_float_hk
+    #     res[convert_float_trs.columns] = convert_float_trs
+    #     # res[convert_string_mkt.columns] = convert_string_mkt
+    #     pd.concat([res, convert_string_mkt()])
+    #     res.replace({'nan': np.nan}, inplace=True)
+    #     return res
 
     # @customer_classificer(param='ast')
     # def convert_string(self, item_type: str) -> dict:

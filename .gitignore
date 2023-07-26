@@ -1,6 +1,7 @@
 # ADD
 .DS_Store
-customer.pkl
+res.pkl
+temp.pkl
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
