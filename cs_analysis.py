@@ -223,6 +223,10 @@ class CustomerAnalysis(CustomerHelper):
 
         res[trs.columns] = trs
         res[ast.columns] = ast
+
+        one_hot_encoding = self.convert_string_mkt()
+
+        res = pd.concat([res, one_hot_encoding], axis=1)
         return trs, ast, res
 
     def convert_string_mkt(self):

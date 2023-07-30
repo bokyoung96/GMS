@@ -2,6 +2,7 @@
 .DS_Store
 res.pkl
 temp.pkl
+res_adj.pkl
 checkpoint.pt
 
 # Byte-compiled / optimized / DLL files
