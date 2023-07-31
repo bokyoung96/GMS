@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 from pytorchtools import *
 from cs_analysis import *
 
-with open('res.pkl', 'rb') as f:
+with open('res_adj.pkl', 'rb') as f:
     data = pickle.load(f)
     print("===== DATA LOADED =====")
 
@@ -33,7 +33,9 @@ class CustomerDL(CustomerAnalysis):
         return res
 
     def get_preprocess_data(self):
-        strs_data = self.get_raw_data().fillna(0)
+        strs_data = self.get_raw_data()
+        strs_data_mean = strs_data.mean()
+        strs_data = strs_data.fillna(strs_data_mean)
         temp = pd.DataFrame(scaler.fit_transform(strs_data),
                             columns=strs_data.columns)
         res = torch.Tensor(temp.to_numpy())
@@ -55,7 +57,7 @@ batch_size = 256
 test_size = 0.2
 random_state = 42
 
-input_size = 328
+input_size = len(data.columns)
 hidden_sizes = [164, 82, 41, 20, 10, 3]
 learning_rate = 0.001
 
@@ -177,11 +179,11 @@ def train_model(model, batch_size, patience, n_epochs):
     return model, avg_train_losses, avg_valid_losses
 
 
-batch_size = 256
-n_epochs = 500
+# batch_size = 256
+# n_epochs = 500
 
-# early stopping patience; how long to wait after last time validation loss improved.
-patience = 20
+# # early stopping patience; how long to wait after last time validation loss improved.
+# patience = 20
 
-model, train_loss, valid_loss = train_model(
-    model, batch_size, patience, n_epochs)
+# model, train_loss, valid_loss = train_model(
+#     model, batch_size, patience, n_epochs)
