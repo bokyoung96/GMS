@@ -1,3 +1,5 @@
+from dateutil.relativedelta import relativedelta
+from datetime import datetime
 from sklearn.preprocessing import RobustScaler
 from itertools import chain
 
@@ -33,7 +35,7 @@ class CustomerAnalysis(CustomerHelper):
         self.mkts = ['런던', '스위스', '노르웨이', '싱가포르', '런던(USD)', '핀란드', '코스피', '인도네시아', '토론토(USD)', '미국기타', 'OTC', '나스닥', '토론토', '*', '상해A', 'UPCOM',
                      '뉴욕', '코스닥', '심천A', '독일', '홍콩(USD)', 'CSE(바이오큐어)', '호주', '호치민', '코넥스', '동경', '홍콩', '프랑스', '아멕스', '토론토벤처', '그리스', '네덜란드']
 
-        self.tkrs = ['.L', '.S', '.OL', '.SI', '.L', '.H', '.KS', '.JK', '.TO', '.PK^L22', '.PK', '', '.TO', '',
+        self.tkrs = ['.L', '.S', '.OL', '.SI', '.L', '.H', '.KS', '.JK', '.TO', '.PK^L22', '.PK', '.O', '.TO', '',
                      '.SS', '.HNO', '', '.KQ', '.SZ', '.DE', '.HK', '.K', '.AX', '.HM', '.KN', '.T', '.HK',
                      '.PA', '.K', '.V', '.AT^L14', '.AS']
 
@@ -51,6 +53,11 @@ class CustomerAnalysis(CustomerHelper):
                          'ovst_ast_itm_rank': CustomerPool.ovst_ast_itm_rank.value,
                          'dmst_ast_mkt_rank': CustomerPool.dmst_ast_mkt_rank.value,
                          'ovst_ast_mkt_rank': CustomerPool.ovst_ast_mkt_rank.value}
+
+        self.date_snp = {'snp_fst_buy_ym': CustomerPool.snp_fst_buy_ym.value,
+                         'snp_fin_buy_ym': CustomerPool.snp_fin_buy_ym.value}
+
+        self.etc_snp = ['LST_BEST_YM', 'APY_FIN_YM']
 
     @staticmethod
     def get_nan(df: pd.DataFrame, threshold: float = 0.95) -> pd.DataFrame:
@@ -129,6 +136,73 @@ class CustomerAnalysis(CustomerHelper):
         res = self.customer[cols].applymap(self.format_float_kr)
         res = res.applymap(self.format_float_hk)
         return res
+
+    def convert_string_mkt(self):
+        """
+        One-hot Encoding.
+        """
+        strs = self.strs_mkts
+        strs = list(strs.values())
+        strs = list(chain(*strs))
+
+        customer = self.customer.filter(strs)
+        dummies = pd.get_dummies(customer[strs])
+        return dummies
+
+    @customer_classificer(param='snp')
+    def convert_date_snp(self, item_type: str):
+        date = self.finder_cols(self.date_snp)
+        df = self.customer.filter(date)
+
+        matched_df = self.split_dfs(df)
+        for col in matched_df.columns:
+            matched_df[col] = pd.to_datetime(matched_df[col], format="%Y%m")
+
+        def calculate_month_difference(row):
+            if pd.isnull(row[0]) or pd.isnull(row[1]):
+                return None
+            diff = relativedelta(row[1], row[0])
+            return diff.years * 12 + diff.months
+
+        date_diff = []
+        for col in range(0, len(matched_df.columns)-1, 2):
+            temp = matched_df.iloc[:, col:col+2]
+            diff = temp.apply(calculate_month_difference, axis=1)
+            date_diff.append(diff)
+
+        date_diff_df = pd.DataFrame(date_diff).T
+        date_diff_df.columns = ['DMST_BUY_YM_DIFF', 'OVST_BUY_YM_DIFF',
+                                'DMETF_BUY_YM_DIFF', 'OVETF_BUY_YM_DIFF']
+        return date_diff_df
+
+    @customer_classificer(param='snp')
+    def convert_etc_snp(self, itme_type: str):
+        df = self.customer.filter(self.etc_snp)
+        for col in df.columns:
+            df[col] = pd.to_datetime(df[col], format='%Y%m')
+
+        base_1 = datetime.strptime('202212', '%Y%m')
+        base_2 = datetime.strptime('201912', '%Y%m')
+
+        def calculate_month_difference(df_parsed: pd.Series, base: datetime):
+            res = []
+            for date in df_parsed:
+                if pd.notnull(date):
+                    diff = relativedelta(base, date)
+                    res.append(diff.years * 12 + diff.months)
+                else:
+                    res.append(None)
+            return res
+
+        base_1_diff = calculate_month_difference(df.iloc[:, 0], base_1)
+        base_2_diff = calculate_month_difference(df.iloc[:, 1], base_2)
+
+        etc_diff_df = pd.DataFrame([base_1_diff, base_2_diff]).T
+        etc_diff_df.columns = ['LST_BEST_YM_DIFF', 'APY_FIN_YM_DIFF']
+
+        etc_diff_df['APY_FIN_YM_DIFF'] = etc_diff_df['APY_FIN_YM_DIFF'] * -1
+        etc_diff_df.replace(-0, 0, inplace=True)
+        return etc_diff_df
 
     @staticmethod
     def finder_cols(strs: dict):
@@ -225,21 +299,16 @@ class CustomerAnalysis(CustomerHelper):
         res[ast.columns] = ast
 
         one_hot_encoding = self.convert_string_mkt()
+        date_diff_df = self.convert_date_snp('snp')
+        etc_diff_df = self.convert_etc_snp('snp')
 
-        res = pd.concat([res, one_hot_encoding], axis=1)
-        return trs, ast, res
+        res.drop(self.finder_cols(self.strs_mkts), axis=1, inplace=True)
+        res.drop(self.finder_cols(self.date_snp) +
+                 self.etc_snp, axis=1, inplace=True)
 
-    def convert_string_mkt(self):
-        """
-        One-hot Encoding.
-        """
-        strs = self.strs_mkts
-        strs = list(strs.values())
-        strs = list(chain(*strs))
-
-        customer = self.customer.filter(strs)
-        dummies = pd.get_dummies(customer[strs])
-        return dummies
+        res = pd.concat(
+            [res, one_hot_encoding, date_diff_df, etc_diff_df], axis=1)
+        return res
 
     # def convert_string_mkt(self):
     #     strs = {'dmst_ast_mkt_rank': CustomerPool.dmst_ast_mkt_rank.value,
