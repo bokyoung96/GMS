@@ -2,7 +2,6 @@
 .DS_Store
 res.pkl
 temp.pkl
-res_adj.pkl
 # LATEST DATA
 res_latest.pkl
 # AUTOENCODER EARLY STOPPING
