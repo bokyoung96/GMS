@@ -5,17 +5,26 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 import torchvision.transforms as transforms
 
-from sklearn.preprocessing import RobustScaler
+from sklearn.preprocessing import RobustScaler, MinMaxScaler
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 from pytorchtools import *
 from cs_analysis import *
 
-with open('res_adj.pkl', 'rb') as f:
+with open('res_latest.pkl', 'rb') as f:
     data = pickle.load(f)
     print("===== DATA LOADED =====")
 
-scaler = RobustScaler()
+# scaler = RobustScaler()
+scaler = MinMaxScaler()
+
+# TODO: 데이터 컬럼이 들어가고 빠지고 한게 있음. 이거 처리 잘해줘야 됨.
+# temp = CustomerHelper('ast')
+# temp.filter_name()
+# filter_name = temp.filter_name()
+# length = len(filter_name)
+# filter_attr = np.concatenate(
+#     [getattr(CustomerPool, filter_name[i]).value for i in range(length)])
 
 
 class CustomerDL(CustomerAnalysis):
@@ -33,9 +42,8 @@ class CustomerDL(CustomerAnalysis):
         return res
 
     def get_preprocess_data(self):
-        strs_data = self.get_raw_data()
-        strs_data_mean = strs_data.mean()
-        strs_data = strs_data.fillna(strs_data_mean)
+        strs_data = data
+        strs_data = strs_data.fillna(strs_data.mean())
         temp = pd.DataFrame(scaler.fit_transform(strs_data),
                             columns=strs_data.columns)
         res = torch.Tensor(temp.to_numpy())
