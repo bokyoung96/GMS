@@ -1,16 +1,23 @@
-from dateutil.relativedelta import relativedelta
-from datetime import datetime
-from sklearn.preprocessing import RobustScaler
+"""
+TEAM 고객의 미래를 새롭게
+
+코드 목적: cs 데이터의 전처리를 진행합니다. 이와 관련한 자세한 내용은 개발기획서에 기록되어 있습니다.
+"""
+
+import pickle
+
 from itertools import chain
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
 
 from loader_cs import *
-from cs_learning import *
-
-
-# AST DECORATOR
 
 
 def customer_classificer(param):
+    """
+    <DESCRIPTION>
+    하단 CustomerAnalysis 클래스에서 cs 데이터의 5가지 카테고리 선택 여부에 따라 코드 실행 유무를 결정할 수 있도록 구현한 데코레이터입니다.
+    """
     def decorator(func):
         def wrapper(self, *args, **kwargs):
             if args and args[0] == param:
@@ -21,10 +28,12 @@ def customer_classificer(param):
     return decorator
 
 
-# CUSTOMER ANALYSIS
-
-
 class CustomerAnalysis(CustomerHelper):
+    """
+    <DESCRIPTION>
+    cs 데이터의 전처리를 진행합니다.
+    """
+
     def __init__(self, item_type: str = 'ast'):
         super().__init__(item_type)
 
@@ -61,12 +70,20 @@ class CustomerAnalysis(CustomerHelper):
 
     @staticmethod
     def get_nan(df: pd.DataFrame, threshold: float = 0.95) -> pd.DataFrame:
+        """
+        <DESCRIPTION>
+        데이터의 컬럼 중 NaN을 threshold 이상으로 보유하고 있는 컬럼은 이상치로 판단하여 제거합니다.
+        """
         nans = df.isna().sum() / len(df)
         res = nans[nans > threshold].index
         return res
 
     @staticmethod
     def get_string(df: pd.DataFrame) -> pd.DataFrame:
+        """
+        <DESCRIPTION>
+        데이터의 컬럼 중 string 데이터를 보유한 컬럼명을 추출합니다.
+        """
         # NOTE: AFTER FILLNA() PROCESS IN get_preprocess.
         strings = df.apply(lambda x: any(isinstance(val, str) for val in x))
         res = df.columns[strings].tolist()
@@ -74,7 +91,11 @@ class CustomerAnalysis(CustomerHelper):
 
     @staticmethod
     def extract_string(df: pd.DataFrame) -> pd.DataFrame:
-        # NOTE: ast / ITM, MKT (str type)
+        """
+        <DESCRIPTION>
+        데이터의 컬럼 중 string 데이터를 보유한 컬럼을 추출합니다.
+        컬럼명(Val), 컬럼에 속한 데이터(Elements) 형태로 추출됩니다.
+        """
         strings = CustomerAnalysis.get_string(df)
 
         temp = []
@@ -88,8 +109,9 @@ class CustomerAnalysis(CustomerHelper):
     @staticmethod
     def format_float_kr(num_str: str):
         """
-        Change strings in KR with .0.
-        EX) 005935 & 5935.0: 5935.0 changes to 005935.
+        <DESCRIPTION>
+        KR 종목번호 중 .0으로 오기입된 종목번호를 변경 표기합니다.
+        EX) 005935 & 5935.0: 5935.0에서 005935로 변경됩니다.
         """
         try:
             num = float(num_str)
@@ -103,8 +125,9 @@ class CustomerAnalysis(CustomerHelper):
     @staticmethod
     def format_float_hk(num_str: str):
         """
-        Change strings in HK with 5 length & 0 in front.
-        EX) 00700 & 002594: 00700 changes to 0700.
+        <DESCRIPTION>
+        HK 종목번호 중 총 글자수 5개 & 0으로 시작하는 오기입된 종목번호를 변경 표기합니다.
+        EX) 00700 & 002594: 00700에서 0700로 변경됩니다..
         """
         try:
             if len(num_str) == 5 and (num_str.startswith('00') or num_str.startswith('0')):
@@ -116,22 +139,33 @@ class CustomerAnalysis(CustomerHelper):
 
     @customer_classificer(param='ast')
     def convert_float_kr(self, item_type: str):
+        """
+        <DESCRIPTION>
+        format_float_kr을 ast에 속한 특정 컬럼에 적용합니다.
+        """
         cols = CustomerPool.dmst_ast_itm_rank.value
         res = self.customer[cols].applymap(self.format_float_kr)
         return res
 
     @customer_classificer(param='ast')
     def convert_float_hk(self, item_type: str):
+        """
+        <DESCRIPTION>
+        format_float_hk을 ast에 속한 특정 컬럼에 적용합니다.
+        """
         cols = CustomerPool.ovst_ast_itm_rank.value
         res = self.customer[cols].applymap(self.format_float_hk)
         return res
 
     @customer_classificer(param='trs')
     def convert_float_trs(self, item_type: str):
+        """
+        <DESCRIPTION>
+        format_float_hk을 trs에 속한 특정 컬럼에 적용합니다.
+        """
         flts = {'buy_trs_itm_rank': CustomerPool.buy_trs_itm_rank.value,
                 'sel_trs_itm_rank': CustomerPool.sel_trs_itm_rank.value}
-        cols = list(flts.values())
-        cols = list(chain(*cols))
+        cols = self.finder_cols(flts)
 
         res = self.customer[cols].applymap(self.format_float_kr)
         res = res.applymap(self.format_float_hk)
@@ -139,11 +173,11 @@ class CustomerAnalysis(CustomerHelper):
 
     def convert_string_mkt(self):
         """
-        One-hot Encoding.
+        <DESCRIPTION>
+        시장 정보 데이터에 One-Hot Encoding을 적용하여 정수형 데이터로 변환합니다.
         """
         strs = self.strs_mkts
-        strs = list(strs.values())
-        strs = list(chain(*strs))
+        strs = self.finder_cols(strs)
 
         customer = self.customer.filter(strs)
         dummies = pd.get_dummies(customer[strs])
@@ -151,6 +185,10 @@ class CustomerAnalysis(CustomerHelper):
 
     @customer_classificer(param='snp')
     def convert_date_snp(self, item_type: str):
+        """
+        <DESCRIPTION>
+        타임스탬프형 데이터 중 DMST, OVST, DMETF, OVETF의 fst_buy_ym, fin_buy_ym간 날짜 차이(월)를 계산해 정수형 데이터로 변환합니다.
+        """
         date = self.finder_cols(self.date_snp)
         df = self.customer.filter(date)
 
@@ -177,6 +215,12 @@ class CustomerAnalysis(CustomerHelper):
 
     @customer_classificer(param='snp')
     def convert_etc_snp(self, itme_type: str):
+        """
+        <DESCRIPTION>
+        타임스탬프형 데이터 중 lst_best_ym과 apy_fin_ym을 특정 조건에 따라 정수형 데이터로 변환합니다.
+        lst_best_ym: 202212까지 날짜 차이(월) 계산
+        apy_fin_ym: 201912부터 날짜 차이(월) 계산
+        """
         df = self.customer.filter(self.etc_snp)
         for col in df.columns:
             df[col] = pd.to_datetime(df[col], format='%Y%m')
@@ -206,13 +250,17 @@ class CustomerAnalysis(CustomerHelper):
 
     @staticmethod
     def finder_cols(strs: dict):
+        """
+        dict 형태의 데이터를 list로 변환합니다.
+        """
         res = list(strs.values())
         res = list(chain(*res))
         return res
 
     def finder_tkrs(self, item_type: str):
         """
-        Find mkts and its representative tckrs.
+        시장 정보 데이터와 이를 대표하는 티커를 산출합니다.
+        Eikon Refinitiv, Bloomberg를 사용하기 위한 선행 코드입니다.
         """
         if item_type == 'trs':
             strs = self.strs_trs
@@ -240,6 +288,9 @@ class CustomerAnalysis(CustomerHelper):
 
     @staticmethod
     def split_dfs(df: pd.DataFrame):
+        """
+        하나의 데이터프레임을 두개로 구분, 이후 열 단위(1열:1열, 2열:2열 등)로 매칭하여 새로운 데이터프레임으로 추출합니다.
+        """
         pd.options.mode.chained_assignment = None
         middle_col = len(df.columns) // 2
         df1 = df.iloc[:, :middle_col]
@@ -253,8 +304,8 @@ class CustomerAnalysis(CustomerHelper):
 
     def get_convert(self):
         """
-        Convert original customer data to analyzable data.
-        Change mkt tkrs to its representative form in Eikon API.
+        cs 데이터를 전처리 과정을 통해 분석 가능한 정수형 데이터로 변환합니다.
+        종목 번호 데이터는 Eikon Refinitiv와 Bloomberg에서 간편히 검색할 수 있도록 변환합니다.
         """
         res = self.customer.copy()
 
@@ -310,109 +361,19 @@ class CustomerAnalysis(CustomerHelper):
             [res, one_hot_encoding, date_diff_df, etc_diff_df], axis=1)
         return res
 
-    # def convert_string_mkt(self):
-    #     strs = {'dmst_ast_mkt_rank': CustomerPool.dmst_ast_mkt_rank.value,
-    #             'ovst_ast_mkt_rank': CustomerPool.ovst_ast_mkt_rank.value,
-    #             'buy_trs_mkt_rank': CustomerPool.buy_trs_mkt_rank.value,
-    #             'sel_trs_mkt_rank': CustomerPool.sel_trs_mkt_rank.value}
-    #     strs = list(strs.values())
-    #     strs = list(chain(*strs))
 
-    #     customer = self.customer.filter(strs)
-    #     unique_df = pd.DataFrame(set(customer.stack().values),
-    #                              columns=['unique_df']).sort_values(by='unique_df')
-    #     unique_df['unique_id'] = pd.factorize(unique_df['unique_df'])[0] + 1
-    #     one_hot = to_categorical(unique_df['unique_id'])
-    #     unique_df['one_hot'] = pd.DataFrame({'one_hot': one_hot.tolist()})
-    #     # unique_df['one_hot'] = unique_df['one_hot'].apply(lambda x: [x])
-    #     # convert_log = dict(zip(unique_df['unique_df'], unique_df['one_hot']))
+"""
+<DESCRIPTION>
+코드 실행 예시입니다.
+본 파일(cs_analysis.py)를 import하는 코드가 존재하므로, 주석 처리해두었습니다.
+"""
 
-    #     convert_log = dict(zip(unique_df['unique_df'], unique_df['unique_id']))
-    #     res = customer.replace(convert_log)
-    #     return res, convert_log
+# if __name__ == "__main__":
+#     # REMINDER: TAKES LONG TIME (10 MIN+)
 
-    # def get_convert(self):
-    #     # NOTE: HIGH TIME-COST
-    #     res = self.customer.copy()
+#     customer_analysis = CustomerAnalysis()
 
-    #     convert_float_kr = self.convert_float_kr('ast')
-    #     convert_float_hk = self.convert_float_hk('ast')
-    #     convert_float_trs = self.convert_float_trs('trs')
-    #     convert_string_mkt = self.convert_string_mkt()
+#     res = customer_analysis.get_convert()
+#     res.to_pickle('res.pkl')
 
-    #     res[convert_float_kr.columns] = convert_float_kr
-    #     res[convert_float_hk.columns] = convert_float_hk
-    #     res[convert_float_trs.columns] = convert_float_trs
-    #     # res[convert_string_mkt.columns] = convert_string_mkt
-    #     pd.concat([res, convert_string_mkt()])
-    #     res.replace({'nan': np.nan}, inplace=True)
-    #     return res
-
-    # @customer_classificer(param='ast')
-    # def convert_string(self, item_type: str) -> dict:
-    #     # NOTE: ITM / high cost to replace.
-    #     # NOTE: Different space / vector & index cannot be used together.
-
-    #     strs = {'dmst_ast_mkt_rank': CustomerPool.dmst_ast_mkt_rank.value,
-    #             'ovst_ast_mkt_rank': CustomerPool.ovst_ast_mkt_rank.value, }
-    #     # 'buy_trs_mkt_rank': CustomerPool.buy_trs_mkt_rank.value,
-    #     # 'sel_trs_mkt_rank': CustomerPool.sel_trs_mkt_rank.value}
-
-    #     def converter(name: str) -> pd.DataFrame:
-    #         temp = self.customer_filter.filter(strs[name])
-    #         unique_df = pd.DataFrame(
-    #             set(temp.stack().values), columns=['unique_df'])
-    #         unique_df['unique_id'] = pd.factorize(
-    #             unique_df['unique_df'])[0] + 1
-    #         convert_log = dict(
-    #             zip(unique_df['unique_df'], unique_df['unique_id']))
-    #         res = temp.replace(convert_log)
-    #         return res, convert_log
-
-    #     log = []
-    #     for key in strs:
-    #         temp, convert_log = converter(key)
-    #         cols = strs[key]
-    #         self.customer_filter[cols] = temp[cols]
-    #         log.append(convert_log)
-    #     return log
-
-    @staticmethod
-    def get_autoencoder(df: pd.DataFrame, latent_dim: int, num_epochs: int):
-        data = torch.Tensor(df.to_numpy())
-
-        input_dim = data.shape[1]
-        model = AutoEncoder(input_dim, latent_dim)
-
-        criterion = nn.MSELoss()
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.005)
-
-        for epoch in range(num_epochs):
-            optimizer.zero_grad()
-            encoded_data, decoded_data = model(data)
-            loss = criterion(decoded_data, data)
-            loss.backward()
-            optimizer.step()
-
-        encoded_data, decoded_data = model(data)
-        encoded_data = torch.Tensor(encoded_data).detach().numpy()
-        decoded_data = torch.Tensor(decoded_data).detach().numpy()
-        return encoded_data, decoded_data
-
-    def get_preprocess(self):
-        scaler = RobustScaler()
-        nans = self.get_nan(self.customer_filter)
-        df = self.customer_filter.drop(nans, axis=1).fillna(0)
-        strs = self.get_string(df)
-
-        temp_strs = df.filter(strs, axis=1)
-        temp_ints = df.drop(strs, axis=1)
-
-        df_scaled = pd.DataFrame(
-            scaler.fit_transform(temp_ints), columns=temp_ints.columns)
-
-        df_encoded = self.get_autoencoder(df_scaled, 3, 100)[0]
-        # TODO: K-means by KMeansClustering in cs_analysis.py
-        # NOTE: Index does not change. Masking will be in progress by index.
-        # NOTE: Use index to reform df including string datas.
-        return df_encoded
+#     print(res)
