@@ -1,11 +1,8 @@
 # ADD
 .DS_Store
+
+# LATEST DATA (08/11)
 res.pkl
-temp.pkl
-# LATEST DATA
-res_latest.pkl
-# AUTOENCODER EARLY STOPPING
-checkpoint.pt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
