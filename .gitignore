@@ -4,6 +4,9 @@
 # LATEST DATA (08/11)
 res.pkl
 
+# LATEST DATA CATEGORY DIVIDED (08/12)
+res_categories
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
