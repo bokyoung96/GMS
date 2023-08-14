@@ -5,7 +5,6 @@ TEAM 고객의 미래를 새롭게
 """
 
 import pickle
-
 from itertools import chain
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
