@@ -7,6 +7,9 @@ res.pkl
 # LATEST DATA CATEGORY DIVIDED (08/12)
 res_categories
 
+# TICKER DATA (09/01)
+cs_ticker_eikon.csv
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

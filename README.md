@@ -7,4 +7,4 @@
 
 # ORDER OF CODES
 
-loader.py - loader_cs.py - cs_analysis.py - loader_cs_adj.py - cs_preprocess.py - cs_autoencoder.py
+loader.py - loader_cs.py - cs_analysis.py - loader_cs_adj.py - cs_ticker.py - cs_preprocess.py - cs_autoencoder.py
