@@ -2,6 +2,9 @@
 TEAM 고객의 미래를 새롭게
 
 코드 목적: cs 데이터의 ticker를 숫자 데이터로 변환합니다.
+
+세부 사항:
+cs 데이터는 기존 1666개 컬럼에서 Ticker 전처리 이후 2242개 컬럼으로 증가했습니다. 
 """
 import re
 import pickle
@@ -124,12 +127,25 @@ class CustomerTicker:
         """
         <DESCRIPTION>
         ast, trs 데이터에서 ticker 데이터를 제거하고, tkr_unite으로 변환된 각 ticker별 재무지표 데이터를 추가합니다.
+        ast 최종 개수: 540개입니다.
+        trs 최종 개수: 1646개입니다.
         """
         temp_tkrs = self.data_loader().drop(self.temp_strs(), axis=1)
         res = pd.concat([temp_tkrs, self.tkr_unite()], axis=1)
         return res
 
 
-customer_ticker = CustomerTicker(item_type='trs')
-res = customer_ticker.tkr_unite()
-fin = customer_ticker.data_transfer()
+"""
+<DESCRIPTION>
+코드 실행 예시입니다.
+하단 코드는 pickle 파일을 생성하므로, 주석 처리해두었습니다.
+"""
+
+if __name__ == "__main__":
+    item_type = ['ast', 'trs']
+
+    for item in item_type:
+        customer_ticker = CustomerTicker(item_type=item)
+        res = customer_ticker.data_transfer()
+        res.to_pickle('./res_categories/res_{}_adj.pkl'.format(item))
+        print("\n ***** res_{}_adj.pkl SAVED *****".format(item))

@@ -44,8 +44,8 @@ class CustomerLoader(CustomerAnalysis):
         기존 124개의 컬럼에서 296개의 One-Hot Encoding mkt 컬럼을 추가합니다.
         이후, One-Hot Encoding에 활용된 24개의 string 형태 mkt 컬럼을 제거합니다.
         최종 개수: 396개입니다.
+        추가 사항: Ticker 변동(Ticker에서 재무지표 데이터로) 전입니다. cs_ticker.py에서 변동됩니다.
         """
-        # TODO: TICKERS
         cols_mkt = [col for col in self.cols_mkt if 'AST' in col]
         cols_pool = self.get_category('ast')
         cols_pool_adj = list(
@@ -60,8 +60,8 @@ class CustomerLoader(CustomerAnalysis):
         기존 336개의 컬럼에서 950개의 One-Hot Encoding mkt 컬럼을 추가합니다.
         이후, One-Hot Encoding에서 활용된 72개의 string 형태 mkt 컬럼을 제거합니다.
         최종 개수: 1214개입니다.
+        추가 사항: Ticker 변동(Ticker에서 재무지표 데이터로) 전입니다. cs_ticker.py에서 변동됩니다.
         """
-        # TODO: TICKERS
         cols_mkt = [col for col in self.cols_mkt if any(
             keyword in col for keyword in ['BUY', 'SEL'])]
         cols_pool = self.get_category('trs')
@@ -130,8 +130,14 @@ class CustomerLoader(CustomerAnalysis):
         return res, res_flatten
 
 
-if __name__ == "__main__":
-    loader = CustomerLoader()
-    res = loader.get_all(save_pkl='N')[0]
-    print("\n ***** CATEGORY DIVIDED ***** \n")
-    print(res)
+"""
+<DESCRIPTION>
+코드 실행 예시입니다.
+하단 코드는 pickle 파일을 생성하므로, 주석 처리해두었습니다.
+"""
+
+# if __name__ == "__main__":
+#     loader = CustomerLoader()
+#     res = loader.get_all(save_pkl='N')[0]
+#     print("\n ***** CATEGORY DIVIDED ***** \n")
+#     print(res)

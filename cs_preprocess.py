@@ -9,29 +9,6 @@ from sklearn.preprocessing import MinMaxScaler
 from cs_analysis import *
 
 
-def temp_strs(item_type: str = 'ast'):
-    # TODO: temp_strs should be deleted after ticker is adjusted.
-    """
-    <DESCRIPTION>
-    cs 데이터 TICKER 업데이트 전, string 형태 데이터를 제외하고 분석을 진행하기 위한 temporary func입니다.
-    CustomerAnalysis() 클래스 호출 비용이 큰 것을 고려해 동일 함수(finder_cols)를 재구현했습니다.
-    ast, trs 카테고리에 활용됩니다.
-    """
-    if item_type == 'ast':
-        strs_itm = {'dmst_ast_itm_rank': CustomerPool.dmst_ast_itm_rank.value,
-                    'ovst_ast_itm_rank': CustomerPool.ovst_ast_itm_rank.value}
-    elif item_type == 'trs':
-        strs_itm = {'buy_trs_itm_rank': CustomerPool.buy_trs_itm_rank.value,
-                    'sel_trs_itm_rank': CustomerPool.sel_trs_itm_rank.value}
-
-    def finder_cols(strs: dict):
-        res = list(strs.values())
-        res = list(chain(*res))
-        return res
-    res = finder_cols(strs_itm)
-    return res
-
-
 class CustomerPreprocess:
     def __init__(self, item_type: str = 'ast'):
         self.item_type = item_type
@@ -40,10 +17,17 @@ class CustomerPreprocess:
         """
         <DESCRIPTION>
         cs 데이터를 카테고리 분류(item_type)에 기반해 로드합니다.
+        CustomerTicker와 같은 함수명을 공유하나, res_{}_adj.pkl을 포함하는 차이가 존재합니다.
         """
-        with open('./res_categories/res_{}.pkl'.format(self.item_type), 'rb') as f:
-            data = pickle.load(f)
-            print("\n ***** DATA LOADED ***** \n")
+        state = any(item == self.item_type for item in ['ast', 'trs'])
+
+        if state:
+            with open('./res_categories/res_{}_adj.pkl'.format(self.item_type), 'rb') as f:
+                data = pickle.load(f)
+        else:
+            with open('./res_categories/res_{}.pkl'.format(self.item_type), 'rb') as f:
+                data = pickle.load(f)
+        print("\n ***** DATA LOADED ***** \n")
         return data
 
     @staticmethod
@@ -52,7 +36,6 @@ class CustomerPreprocess:
         <DESCRIPTION>
         데이터의 NaN값을 해당 컬럼의 평균값으로 변환합니다.
         """
-        # TODO: Consider data with NaNs considering 0 transactions.
         return df.fillna(df.mean())
 
     @staticmethod
@@ -71,9 +54,6 @@ class CustomerPreprocess:
         cs 데이터를 카테고리 분류에 기반해 로드하고 전처리를 진행합니다.
         """
         data = self.data_loader()
-        data.drop(columns=temp_strs(self.item_type), inplace=True)
-        # TODO: temp_strs should be deleted after ticker is adjusted.
-
         res = self.pp_scaling(self.pp_nans(data))
         return res
 
