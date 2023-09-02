@@ -10,6 +10,9 @@ res_categories
 # TICKER DATA (09/01)
 cs_ticker_eikon.csv
 
+# LATEST DATA PP (09/02)
+res_pp_categories
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
