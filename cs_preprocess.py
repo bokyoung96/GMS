@@ -43,8 +43,9 @@ class CustomerPreprocess:
         """
         <DESCRIPTION>
         데이터에 스케일링을 적용합니다.
+        One-Hot Encoding이 적용된 데이터는 스케일링이 진행되지 않습니다.
+        세부 사항은 하단 pp_load()에서 다루어집니다.
         """
-        # TODO: Consider whether scaling should be applied in every columns.
         return MinMaxScaler().fit_transform(df)
 
     @property
@@ -54,7 +55,25 @@ class CustomerPreprocess:
         cs 데이터를 카테고리 분류에 기반해 로드하고 전처리를 진행합니다.
         """
         data = self.data_loader()
-        res = self.pp_scaling(self.pp_nans(data))
+
+        customer_analysis = CustomerAnalysis()
+        encoding_data = customer_analysis.convert_string_mkt()
+        encoding_cols = encoding_data.columns.tolist()
+
+        state = any(item == self.item_type for item in ['ast', 'trs'])
+        if state:
+            drop_cols = [col for col in encoding_cols if col in data.columns]
+            data.drop(drop_cols, axis=1, inplace=True)
+            data_cols = data.columns
+            temp = encoding_data[drop_cols]
+
+            res = self.pp_scaling(self.pp_nans(data))
+            res = pd.DataFrame(res, columns=data_cols)
+            res = pd.concat([res, temp], axis=1)
+        else:
+            data_cols = data.columns
+            res = self.pp_scaling(self.pp_nans(data))
+            res = pd.DataFrame(res, columns=data_cols)
         return res
 
 
@@ -64,6 +83,12 @@ class CustomerPreprocess:
 본 파일(cs_preprocess.py)를 import하는 코드가 존재하므로, 주석 처리해두었습니다.
 """
 
-# if __name__ == "__main__":
-#     pp = CustomerPreprocess(item_type='ast')
-#     data = pp.pp_load
+if __name__ == "__main__":
+    item_type = ['ast', 'trs', 'acs', 'snp', 'rto']
+
+    for item in item_type:
+        pp = CustomerPreprocess(item_type=item)
+        data = pp.pp_load
+        data.to_pickle('./res_pp_categories/res_pp_{}.pkl'.format(item))
+        print("\n ***** res_pp_{}.pkl SAVED *****".format(item))
+    print("***** TASK COMPLETED *****")

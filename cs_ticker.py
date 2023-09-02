@@ -120,7 +120,7 @@ class CustomerTicker:
 
         print("\n ***** UNITING... ***** \n")
         res = pd.concat(temp, axis=1)
-        print("**** TASK COMPLETED *****")
+        print("***** TASK COMPLETED *****")
         return res
 
     def data_transfer(self) -> pd.DataFrame:
@@ -141,11 +141,11 @@ class CustomerTicker:
 하단 코드는 pickle 파일을 생성하므로, 주석 처리해두었습니다.
 """
 
-if __name__ == "__main__":
-    item_type = ['ast', 'trs']
+# if __name__ == "__main__":
+#     item_type = ['ast', 'trs']
 
-    for item in item_type:
-        customer_ticker = CustomerTicker(item_type=item)
-        res = customer_ticker.data_transfer()
-        res.to_pickle('./res_categories/res_{}_adj.pkl'.format(item))
-        print("\n ***** res_{}_adj.pkl SAVED *****".format(item))
+#     for item in item_type:
+#         customer_ticker = CustomerTicker(item_type=item)
+#         res = customer_ticker.data_transfer()
+#         res.to_pickle('./res_categories/res_{}_adj.pkl'.format(item))
+#         print("\n ***** res_{}_adj.pkl SAVED *****".format(item))
