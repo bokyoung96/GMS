@@ -9,12 +9,14 @@ cs 데이터는 기존 520개 컬럼에서 전처리 이후 1666개 컬럼으로
 """
 
 import pickle
+import os
 
 from cs_analysis import *
 
-with open('res.pkl', 'rb') as f:
-    data = pickle.load(f)
-    print("\n ***** DATA LOADED ***** \n")
+
+dir_name = "./res_categories/"
+if not os.path.exists(dir_name):
+    os.makedirs(dir_name)
 
 
 class CustomerLoader(CustomerAnalysis):
@@ -26,6 +28,9 @@ class CustomerLoader(CustomerAnalysis):
     def __init__(self, item_type: str = 'ast'):
         super().__init__(item_type)
         self.cols_mkt = self.convert_string_mkt().columns.tolist()
+        with open('res.pkl', 'rb') as f:
+            self.data = pickle.load(f)
+            print("\n ***** DATA LOADED *****")
 
     def get_category(self, item_type: str):
         """
@@ -124,7 +129,9 @@ class CustomerLoader(CustomerAnalysis):
                 res.append(method())
                 res_flatten.extend(method())
                 if save_pkl == 'Y':
-                    data[method()].to_pickle('res_{}.pkl'.format(category))
+                    self.data[method()].to_pickle(
+                        './res_categories/res_{}.pkl'.format(category))
+                    print("\n ***** res_{}_adj.pkl SAVED *****".format(category))
                 else:
                     pass
         return res, res_flatten
