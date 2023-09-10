@@ -83,12 +83,12 @@ class CustomerPreprocess:
 본 파일(cs_preprocess.py)를 import하는 코드가 존재하므로, 주석 처리해두었습니다.
 """
 
-if __name__ == "__main__":
-    item_type = ['ast', 'trs', 'acs', 'snp', 'rto']
+# if __name__ == "__main__":
+#     item_type = ['ast', 'trs', 'acs', 'snp', 'rto']
 
-    for item in item_type:
-        pp = CustomerPreprocess(item_type=item)
-        data = pp.pp_load
-        data.to_pickle('./res_pp_categories/res_pp_{}.pkl'.format(item))
-        print("\n ***** res_pp_{}.pkl SAVED *****".format(item))
-    print("***** TASK COMPLETED *****")
+#     for item in item_type:
+#         pp = CustomerPreprocess(item_type=item)
+#         data = pp.pp_load
+#         data.to_pickle('./res_pp_categories/res_pp_{}.pkl'.format(item))
+#         print("\n ***** res_pp_{}.pkl SAVED *****".format(item))
+#     print("***** TASK COMPLETED *****")

@@ -13,8 +13,9 @@ import mpl_toolkits.mplot3d.axes3d as p3
 from tqdm import tqdm
 from torch import nn, optim
 from torch.utils.data import DataLoader, TensorDataset
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
 from sklearn.model_selection import train_test_split
-from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
 
 class AutoEncoder(nn.Module):
@@ -140,7 +141,45 @@ class AELoader:
         plt.show()
 
 
-if __name__ == "__main__":
-    loader = AELoader(item_type='ast')
-    mse, enc, dec = loader.ae_run(n_epochs=100)
-    loader.ae_plot(enc=enc)
+class KMLoader(AELoader):
+    def __init__(self,
+                 item_type: str = 'ast',
+                 test_size: float = 0.2,
+                 enc_shape: int = 3,
+                 dropout: float = 0.2,
+                 n_epochs: int = 100):
+        super().__init__(item_type, test_size, enc_shape, dropout)
+        self.n_epochs = n_epochs
+        self.enc = pd.DataFrame(self.ae_run(n_epochs=self.n_epochs)[1])
+
+    def km_n_clusters(self):
+        # NOTE: HIGH COST
+        for n_clusters in range(2, 6):
+            model = KMeans(n_clusters=n_clusters,
+                           random_state=42).fit(self.enc)
+            score = silhouette_score(self.enc, model.labels_)
+            print("***** Cluster: {} || Silhouette index: {}".format(n_clusters, score))
+        return
+
+    def km_run(self):
+        df = self.enc.copy()
+        model = KMeans(n_clusters=5, random_state=42).fit(self.enc)
+        df['LABEL'] = model.labels_
+
+        fig = plt.figure(figsize=(10, 10))
+        ax = fig.add_subplot(111, projection='3d')
+        ax.scatter(df.iloc[:, 0],
+                   df.iloc[:, 1],
+                   df.iloc[:, 2],
+                   c=df.LABEL,
+                   s=10,
+                   cmap='rainbow',
+                   alpha=1)
+        plt.show()
+        return df
+
+
+# if __name__ == "__main__":
+#     loader = AELoader(item_type='ast')
+#     mse, enc, dec = loader.ae_run(n_epochs=100)
+#     loader.ae_plot(enc=enc)
