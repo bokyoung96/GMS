@@ -7,7 +7,7 @@
 
 # ORDER OF CODES
 
-loader.py - loader_cs.py - cs_analysis.py - loader_cs_adj.py - cs_ticker.py - cs_preprocess.py - cs_autoencoder.py
+![Code flow chart](https://github.com/bokyoung96/GMS/assets/49546804/d44073bd-9a1a-44eb-9639-831c6d176285)
 
 # FILES IN GITIGNORE
 
