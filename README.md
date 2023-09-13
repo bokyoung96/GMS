@@ -7,4 +7,5 @@
 
 # ORDER OF CODES
 
-![Code flow chart](https://github.com/bokyoung96/GMS/assets/49546804/87d924d8-30b8-4068-afe1-8644c372f4fd)
+![Code flow chart](https://github.com/bokyoung96/GMS/assets/49546804/8c5684b3-1975-4255-be29-2915abc30598)
+
