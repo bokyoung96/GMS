@@ -131,7 +131,7 @@ class CustomerLoader(CustomerAnalysis):
                 if save_pkl == 'Y':
                     self.data[method()].to_pickle(
                         './res_categories/res_{}.pkl'.format(category))
-                    print("\n ***** res_{}_adj.pkl SAVED *****".format(category))
+                    print("\n ***** res_{}.pkl SAVED *****".format(category))
                 else:
                     pass
         return res, res_flatten

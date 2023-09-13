@@ -2,184 +2,227 @@
 TEAM 고객의 미래를 새롭게
 
 코드 목적: cs 데이터를 AutoEncoder로 분석합니다.
-참조: https://github.com/techshot25/Autoencoders
 """
-import torch
+import os
 import pickle
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 import matplotlib.pyplot as plt
-import mpl_toolkits.mplot3d.axes3d as p3
-from tqdm import tqdm
-from torch import nn, optim
-from torch.utils.data import DataLoader, TensorDataset
-from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score
+from keras.layers import Dense, Input, LeakyReLU, Dropout
+from keras.models import Model, load_model
+from keras.optimizers import Adam
+from keras.callbacks import EarlyStopping, ModelCheckpoint
 from sklearn.model_selection import train_test_split
 
 
-class AutoEncoder(nn.Module):
-    def __init__(self, in_shape, enc_shape, dropout):
-        super(AutoEncoder, self).__init__()
+config = tf.compat.v1.ConfigProto()
+config.gpu_options.allow_growth = True
+session = tf.compat.v1.Session(config=config)
 
-        self.dropout = dropout
-
-        self.encode = nn.Sequential(
-            nn.Linear(in_shape, 270),
-            nn.ReLU(True),
-            nn.Dropout(self.dropout),
-            nn.Linear(270, 135),
-            nn.ReLU(True),
-            nn.Dropout(self.dropout),
-            nn.Linear(135, 67),
-            nn.ReLU(True),
-            nn.Dropout(self.dropout),
-            nn.Linear(67, 32),
-            nn.ReLU(True),
-            nn.Dropout(self.dropout),
-            nn.Linear(32, 16),
-            nn.ReLU(True),
-            nn.Dropout(self.dropout),
-            nn.Linear(16, 8),
-            nn.ReLU(True),
-            nn.Dropout(self.dropout),
-            nn.Linear(8, enc_shape)
-        )
-
-        self.decode = nn.Sequential(
-            nn.BatchNorm1d(enc_shape),
-            nn.Linear(enc_shape, 8),
-            nn.ReLU(True),
-            nn.Dropout(0.2),
-            nn.Linear(8, 16),
-            nn.ReLU(True),
-            nn.Dropout(dropout),
-            nn.Linear(16, 32),
-            nn.ReLU(True),
-            nn.Dropout(0.2),
-            nn.Linear(32, 67),
-            nn.ReLU(True),
-            nn.Dropout(0.2),
-            nn.Linear(67, 135),
-            nn.ReLU(True),
-            nn.Dropout(0.2),
-            nn.Linear(135, 270),
-            nn.ReLU(True),
-            nn.Dropout(0.2),
-            nn.Linear(270, in_shape)
-        )
-
-    def forward(self, x):
-        x = self.encode(x)
-        x = self.decode(x)
-        return x
+dir_name = "./cs_ae_callback/"
+if not os.path.exists(dir_name):
+    os.makedirs(dir_name)
 
 
-class AELoader:
-    def __init__(self, item_type: str,
-                 test_size: float = 0.2,
-                 enc_shape: int = 3,
-                 dropout: float = 0.2):
+class AutoEncoder:
+    """
+    <DESCRIPTION>
+    Tensorflow keras에 기반하여 AutoEncoder를 구현합니다.
+    """
+
+    def __init__(self,
+                 item_type: str = 'ast',
+                 test_size: int = 0.2,
+                 epochs: int = 100):
         self.item_type = item_type
         self.test_size = test_size
-        self.enc_shape = enc_shape
-        self.dropout = dropout
-        self.device = ('cuda' if torch.cuda.is_available() else 'cpu')
-        print("***** USED DEVICE WILL BE: {} *****".format(self.device))
+        self.epochs = epochs
 
     @property
     def data_loader(self) -> pd.DataFrame:
+        """
+        <DESCRIPTION>
+        cs 데이터를 카테고리 분류(item_type)에 기반해 로드합니다.
+        """
         with open('./res_pp_categories/res_pp_{}.pkl'.format(self.item_type), 'rb') as f:
             data = pickle.load(f)
-        print("\n ***** DATA LOADED ***** \n")
+        print("\n ***** DATA CATEGORY {} LOADED ***** \n".format(self.item_type))
         return data
 
-    def to_torch(self):
-        data = self.data_loader.values
-        return torch.from_numpy(data).to(self.device)
+    @property
+    def data_split(self) -> pd.DataFrame:
+        """
+        <DESCRIPTION>
+        cs 데이터를 train / validation set으로 구분합니다.
+        """
+        data = self.data_loader
+        x_train, x_val = train_test_split(data,
+                                          test_size=self.test_size,
+                                          random_state=42)
+        return x_train, x_val
 
-    @staticmethod
-    def ae_train(model, error, optimizer, n_epochs, x):
-        model.train()
-        for epoch in range(1, n_epochs + 1):
-            optimizer.zero_grad()
-            output = model(x)
-            loss = error(output, x)
-            loss.backward()
-            optimizer.step()
+    def auto_encoder(self, output_dim: int = 3):
+        """
+        <DESCRIPTION>
+        AutoEncoder를 구현합니다.
+        trs 카테고리 데이터는 학습 오류로 제외하였습니다.
+        """
+        # DATA
+        x_train, x_val = self.data_split
 
-            if epoch % int(0.01*n_epochs) == 0:
-                print(f'Epoch {epoch} \t Loss: {loss.item():.4g}')
+        # SHAPES & LAYERS
+        input_dim = x_train.shape[1]
+        layers = round(input_dim / 2)
 
-            if loss.item() < 0.05:
-                print("\n ***** LOSS UNDER 0.05 - PROCESS FINISHED ***** \n")
-                break
+        if self.item_type == 'rto':
+            input_layer = Input((input_dim, ))
 
-    def ae_run(self, n_epochs: int = 100):
-        x = self.to_torch()
-        auto_encoder = AutoEncoder(in_shape=x.shape[1],
-                                   enc_shape=self.enc_shape,
-                                   dropout=self.dropout).double().to(self.device)
-        error = nn.MSELoss()
-        optimizer = optim.Adam(auto_encoder.parameters())
+            encode_layer = Dense(5, activation='relu')(input_layer)
+            encode_layer = Dense(4, activation='relu')(encode_layer)
 
-        self.ae_train(auto_encoder, error, optimizer, n_epochs, x)
-        with torch.no_grad():
-            encoded = auto_encoder.encode(x)
-            decoded = auto_encoder.decode(encoded)
-            mse = error(decoded, x).item()
-            enc = encoded.cpu().detach().numpy()
-            dec = decoded.cpu().detach().numpy()
-        return mse, enc, dec
+            latent_layer = Dense(3, activation='sigmoid')(encode_layer)
 
-    def ae_plot(self, enc: np.ndarray):
-        fig = plt.figure()
-        ax = p3.Axes3D(fig)
-        ax.scatter(enc[:, 0], enc[:, 1], enc[:, 2], cmap=plt.cm.jet)
+            decode_layer = Dense(4, activation='relu')(latent_layer)
+            decode_layer = Dense(5, activation='relu')(decode_layer)
+            decode_layer = Dense(6, activation='relu')(decode_layer)
 
-        plt.title("ENCODED DATA: {}".format(self.item_type))
+        elif self.item_type == 'trs':
+            input_layer = Input((input_dim, ))
+
+            encode_layer = Dense(
+                1024, activation=LeakyReLU(alpha=0.3))(input_layer)
+            encode_layer = Dense(
+                512, activation=LeakyReLU(alpha=0.3))(encode_layer)
+            encode_layer = Dense(
+                256, activation=LeakyReLU(alpha=0.3))(encode_layer)
+            encode_layer = Dense(
+                128, activation=LeakyReLU(alpha=0.3))(encode_layer)
+            encode_layer = Dense(
+                64, activation=LeakyReLU(alpha=0.3))(encode_layer)
+            encode_layer = Dense(
+                32, activation=LeakyReLU(alpha=0.3))(encode_layer)
+            encode_layer = Dense(
+                16, activation=LeakyReLU(alpha=0.3))(encode_layer)
+            encode_layer = Dense(
+                8, activation=LeakyReLU(alpha=0.3))(encode_layer)
+            encode_layer = Dense(
+                4, activation=LeakyReLU(alpha=0.3))(encode_layer)
+
+            latent_layer = Dense(3, activation='sigmoid')(encode_layer)
+
+            decode_layer = Dense(
+                4, activation=LeakyReLU(alpha=0.3))(latent_layer)
+            decode_layer = Dense(
+                8, activation=LeakyReLU(alpha=0.3))(decode_layer)
+            decode_layer = Dense(
+                16, activation=LeakyReLU(alpha=0.3))(decode_layer)
+            decode_layer = Dense(
+                32, activation=LeakyReLU(alpha=0.3))(decode_layer)
+            decode_layer = Dense(
+                64, activation=LeakyReLU(alpha=0.3))(decode_layer)
+            decode_layer = Dense(
+                128, activation=LeakyReLU(alpha=0.3))(decode_layer)
+            decode_layer = Dense(
+                256, activation=LeakyReLU(alpha=0.3))(decode_layer)
+            decode_layer = Dense(
+                512, activation=LeakyReLU(alpha=0.3))(decode_layer)
+            decode_layer = Dense(
+                1024, activation=LeakyReLU(alpha=0.3))(decode_layer)
+            decode_layer = Dense(1646, activation='sigmoid')(decode_layer)
+
+        else:
+            layer_sizes = []
+            for layer in range(layers):
+                layer_size = max(output_dim, int(input_dim / (2**layer)))
+                if layer_size <= output_dim:
+                    break
+                layer_sizes.append(layer_size)
+
+            # INPUT LAYER
+            input_layer = Input((input_dim, ))
+
+            # ENCODE LAYER
+            encode_layer = Dense(
+                layer_sizes[1], activation='relu')(input_layer)
+            for size in layer_sizes[2:]:
+                encode_layer = Dense(size, activation='relu')(encode_layer)
+
+            # LATENT LAYER
+            latent_layer = Dense(
+                output_dim, activation='sigmoid')(encode_layer)
+
+            # DECODE LAYER
+            layer_sizes.reverse()
+            decode_layer = Dense(
+                layer_sizes[0], activation='relu')(latent_layer)
+            for size in layer_sizes[1:-1]:
+                decode_layer = Dense(size, activation='relu')(decode_layer)
+            decode_layer = Dense(
+                layer_sizes[-1], activation='relu')(decode_layer)
+
+        # MODEL
+        model = Model(inputs=input_layer,
+                      outputs=decode_layer)
+        adam = Adam(
+            learning_rate=0.0001, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
+        model.compile(optimizer=adam, loss='mse')
+        model.summary()
+
+        # CALLBACKS
+        checkpoints = ModelCheckpoint(filepath='./cs_ae_callback/cs_autoencoder_callback_{}.hdf5'.format(self.item_type),
+                                      monitor='val_loss',
+                                      save_best_only=True)
+        early_stopping = EarlyStopping(monitor='val_loss',
+                                       min_delta=0.00001,
+                                       patience=10,
+                                       verbose=1,
+                                       mode='auto')
+        callbacks = [checkpoints, early_stopping]
+
+        # FITTING
+        res = model.fit(x_train,
+                        x_train,
+                        epochs=self.epochs,
+                        batch_size=32,
+                        validation_data=(x_val, x_val),
+                        callbacks=callbacks)
+
+        stopped_epoch = early_stopping.stopped_epoch
+        return model, res, stopped_epoch
+
+    def auto_encoder_plot(self, res, stopped_epoch):
+        """
+        <DESCRIPTION>
+        각 카테고리별 AutoEncoder의 training, validation loss를 그래프로 나타냅니다.
+        """
+        epoch = np.arange(1, len(res.history['loss'])+1)
+        plt.figure(figsize=(15, 5))
+        plt.plot(epoch, res.history['loss'],
+                 linewidth=2, label='Training loss')
+        plt.plot(epoch, res.history['val_loss'],
+                 linewidth=2, label='Validation loss')
+        plt.axvline(x=stopped_epoch, color='r', linestyle='--',
+                    label='Early stopping epoch')
+        plt.title('AutoEncoder performance in {} category'.format(self.item_type))
+        plt.xlabel('Epochs')
+        plt.ylabel('Loss')
+        plt.legend()
         plt.show()
 
-
-class KMLoader(AELoader):
-    def __init__(self,
-                 item_type: str = 'ast',
-                 test_size: float = 0.2,
-                 enc_shape: int = 3,
-                 dropout: float = 0.2,
-                 n_epochs: int = 100):
-        super().__init__(item_type, test_size, enc_shape, dropout)
-        self.n_epochs = n_epochs
-        self.enc = pd.DataFrame(self.ae_run(n_epochs=self.n_epochs)[1])
-
-    def km_n_clusters(self):
-        # NOTE: HIGH COST
-        for n_clusters in range(2, 6):
-            model = KMeans(n_clusters=n_clusters,
-                           random_state=42).fit(self.enc)
-            score = silhouette_score(self.enc, model.labels_)
-            print("***** Cluster: {} || Silhouette index: {}".format(n_clusters, score))
-        return
-
-    def km_run(self):
-        df = self.enc.copy()
-        model = KMeans(n_clusters=5, random_state=42).fit(self.enc)
-        df['LABEL'] = model.labels_
-
-        fig = plt.figure(figsize=(10, 10))
-        ax = fig.add_subplot(111, projection='3d')
-        ax.scatter(df.iloc[:, 0],
-                   df.iloc[:, 1],
-                   df.iloc[:, 2],
-                   c=df.LABEL,
-                   s=10,
-                   cmap='rainbow',
-                   alpha=1)
-        plt.show()
-        return df
+        plt.savefig('./loss_plot_{}.png'.format(self.item_type))
 
 
-# if __name__ == "__main__":
-#     loader = AELoader(item_type='ast')
-#     mse, enc, dec = loader.ae_run(n_epochs=100)
-#     loader.ae_plot(enc=enc)
+"""
+<DESCRIPTION>
+코드 실행 예시입니다.
+본 파일(cs_autoencoder.py)를 import하는 코드가 존재하므로, 주석 처리해두었습니다.
+"""
+
+if __name__ == "__main__":
+    items = ['ast', 'trs', 'acs', 'snp', 'rto']
+    items = ['trs']
+    for item in items:
+        loader = AutoEncoder(item_type=item)
+        model, res, stopped_epoch = loader.auto_encoder(output_dim=3)
+        loader.auto_encoder_plot(res, stopped_epoch)

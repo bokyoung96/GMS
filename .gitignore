@@ -13,6 +13,13 @@ cs_ticker_eikon.csv
 # LATEST DATA PP (09/02)
 res_pp_categories
 
+# ETC DATA TO HIDE
+res_clustering.pkl
+res_shapley.pkl
+
+# CALLBACKS TO HIDE
+cs_ae_callback
+
 # DATA GIVEN
 mirae-apy_itm_hist.csv
 mirae-cs_data.csv
