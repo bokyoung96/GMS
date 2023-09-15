@@ -1,0 +1,16 @@
+사용된 특수 라이브러리는 다음과 같습니다.
+
+1. shap
+pip install shap로 설치 가능
+
+2. tensorflow
+pip install tensorflow로 설치 가능
+
+3. keras
+pip install keras로 설치 가능
+
+4. eikon
+pip install eikon으로 설치 가능
+
+5. FinanceDataReader
+pip install finance-datareader로 설치 가능
