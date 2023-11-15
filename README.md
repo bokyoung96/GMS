@@ -21,5 +21,5 @@
 
 # ORDER OF CODES
 
-![Code flow chart](https://github.com/bokyoung96/GMS/assets/49546804/8c5684b3-1975-4255-be29-2915abc30598)
+![Code flow chart](https://github.com/bokyoung96/GMS/assets/49546804/4c43446e-5ca6-4c35-b693-9fbbbca9c55f)
 
